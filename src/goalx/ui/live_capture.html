@@ -1,0 +1,847 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GoalX Live Match Capture</title>
+    <style>
+      :root {
+        --bg: #071117;
+        --panel: #101a22;
+        --panel-alt: #0b1420;
+        --line: #294055;
+        --green: #00d48b;
+        --green-soft: rgba(0, 212, 139, 0.14);
+        --blue: #5bc0ff;
+        --amber: #ffbf47;
+        --red: #ff6d6d;
+        --text: #edf4ff;
+        --muted: #9ab0c0;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: radial-gradient(circle at top, #112230 0%, var(--bg) 55%);
+        color: var(--text);
+        font-family: "Segoe UI", Tahoma, sans-serif;
+      }
+
+      .page {
+        width: min(1400px, calc(100% - 32px));
+        margin: 24px auto;
+      }
+
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 18px;
+      }
+
+      .title-group h1 {
+        margin: 0;
+        font-size: clamp(28px, 2vw, 42px);
+      }
+
+      .title-group p {
+        margin: 6px 0 0;
+        color: var(--muted);
+      }
+
+      .actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        border: 1px solid var(--line);
+        background: linear-gradient(180deg, #193247 0%, #0f1e2c 100%);
+        color: var(--text);
+        padding: 10px 16px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-weight: 700;
+      }
+
+      .btn.primary {
+        background: linear-gradient(180deg, var(--green) 0%, #08aa74 100%);
+        color: #03160e;
+        border-color: transparent;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 1.55fr 0.9fr;
+        gap: 18px;
+      }
+
+      .panel {
+        background: rgba(10, 17, 24, 0.9);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+      }
+
+      .capture { padding: 20px; }
+      .hud {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 18px;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: rgba(15, 25, 35, 0.8);
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        background: var(--green-soft);
+        color: var(--green);
+        border: 1px solid rgba(0, 212, 139, 0.35);
+      }
+
+      .tag.warn {
+        background: rgba(255, 191, 71, 0.12);
+        border-color: rgba(255, 191, 71, 0.4);
+        color: var(--amber);
+      }
+
+      .scorebox {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        font-weight: 800;
+        font-size: 16px;
+      }
+
+      .controls {
+        display: grid;
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+
+      label {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 6px;
+      }
+
+      input, select {
+        width: 100%;
+        background: #0e131b;
+        color: #e8ecf1;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px;
+      }
+
+      .crop-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .window-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr auto auto;
+        gap: 8px;
+      }
+
+      .button-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .field {
+        position: relative;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 3440 / 1440;
+        border-radius: 16px;
+        overflow: hidden;
+        background: #05080c;
+        border: 1px solid rgba(255,255,255,0.1);
+      }
+
+      .field img.live-frame {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        object-position: center;
+        opacity: 0.92;
+      }
+
+      .field::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+        background:
+          linear-gradient(to right, transparent 49.7%, rgba(255,255,255,0.18) 49.7%, rgba(255,255,255,0.18) 50.3%, transparent 50.3%),
+          linear-gradient(to bottom, transparent 49.7%, rgba(255,255,255,0.18) 49.7%, rgba(255,255,255,0.18) 50.3%, transparent 50.3%);
+      }
+
+      .overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+      }
+
+      .player-dot, .ball {
+        position: absolute;
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+      }
+
+      .player-dot {
+        width: 14px;
+        height: 14px;
+        box-shadow: 0 0 12px rgba(255,255,255,0.45);
+        border: 2px solid rgba(255,255,255,0.7);
+      }
+
+      :root {
+        --team-color: #7dffb5;
+        --opp-color: #ff4d4d;
+      }
+      .player-dot.team { background: var(--team-color); }
+      .player-dot.opp { background: var(--opp-color); }
+      .player-dot.map-team {
+        width: 9px;
+        height: 9px;
+        background: var(--team-color);
+        border-color: rgba(255,255,255,0.85);
+      }
+      .player-dot.map-opp {
+        width: 9px;
+        height: 9px;
+        background: var(--opp-color);
+        border-radius: 2px;
+      }
+      .player-dot.map-self {
+        width: 12px;
+        height: 12px;
+        background: var(--team-color);
+        border: 2px solid #ffe566;
+        box-shadow: 0 0 10px rgba(255, 229, 102, 0.8);
+      }
+      .player-dot.stale { opacity: 0.45; filter: grayscale(0.6); }
+      .kits {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .kits .swatch {
+        width: 14px;
+        height: 14px;
+        border-radius: 4px;
+        border: 1px solid rgba(255,255,255,0.35);
+        background: #333;
+        display: inline-block;
+      }
+      .kits .kit-label b { color: #fff; font-weight: 700; text-transform: capitalize; }
+      .kits .kit-conf { opacity: 0.8; }
+      .btn.mini { padding: 2px 8px; font-size: 11px; }
+      .ball.map-ball {
+        width: 8px;
+        height: 8px;
+        background: #ffe566;
+      }
+      .map-ring {
+        position: absolute;
+        border: 2px solid rgba(0, 212, 139, 0.55);
+        border-radius: 50%;
+        pointer-events: none;
+        box-shadow: inset 0 0 18px rgba(0, 212, 139, 0.12);
+      }
+      .tactical-map {
+        position: relative;
+        margin-top: 14px;
+        width: 100%;
+        aspect-ratio: 1;
+        border-radius: 50%;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at center, rgba(46, 90, 48, 0.9) 0%, rgba(16, 32, 22, 0.95) 72%, #071117 73%);
+        border: 2px solid rgba(0, 212, 139, 0.35);
+      }
+      .tactical-map .grid {
+        position: absolute;
+        inset: 18%;
+        border: 1px solid rgba(255,255,255,0.18);
+      }
+      .ball {
+        width: 16px;
+        height: 16px;
+        background: #f4f7ff;
+        box-shadow: 0 0 14px rgba(255,255,255,0.75);
+      }
+
+      .stats { padding: 20px; }
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 14px;
+      }
+
+      .kpi {
+        background: var(--panel-alt);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+      }
+
+      .kpi .label {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .kpi .value {
+        display: block;
+        margin-top: 8px;
+        font-weight: 800;
+        font-size: 28px;
+      }
+
+      .radar-wrap {
+        margin-top: 18px;
+        padding: 8px;
+        border-radius: 12px;
+        background: var(--panel-alt);
+        border: 1px solid var(--line);
+      }
+
+      .radar-wrap img {
+        display: block;
+        width: 100%;
+        height: auto;
+        background: #f4f7ff;
+        border-radius: 10px;
+      }
+
+      .suggestions, .status-box {
+        margin-top: 18px;
+        background: var(--panel-alt);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+      }
+
+      .suggestions h3 {
+        margin: 0 0 10px;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+
+      .suggestions ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 10px;
+      }
+
+      .suggestions li {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: rgba(255,255,255,0.02);
+        border: 1px solid rgba(255,255,255,0.05);
+      }
+
+      .bullet {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-top: 7px;
+        background: var(--green);
+        flex-shrink: 0;
+      }
+
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: var(--muted);
+        font-family: Consolas, monospace;
+        font-size: 12px;
+      }
+
+      @media (max-width: 980px) {
+        .layout { grid-template-columns: 1fr; }
+        .field { aspect-ratio: 3440 / 1440; }
+        .window-row, .crop-grid { grid-template-columns: 1fr 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="topbar">
+        <div class="title-group">
+          <h1>GoalX Live Match Capture</h1>
+          <p>Local Rematch visual overlay: window capture, pitch tracking, GoalX coaching</p>
+        </div>
+        <div class="actions">
+          <button class="btn primary" id="toggleCaptureBtn">Start capture</button>
+          <button class="btn" id="refreshBtn">Refresh data</button>
+        </div>
+      </div>
+
+      <div class="layout">
+        <section class="panel capture">
+          <div class="hud">
+            <div class="tag" id="captureStateTag">WAITING</div>
+            <div class="scorebox">
+              <span id="hudFlag">HUD off</span>
+              <span style="color: var(--muted);">·</span>
+              <span id="windowFlag">Window off</span>
+              <span style="color: var(--muted);">·</span>
+              <span id="mapFlag">Map off</span>
+              <span style="color: var(--muted);">·</span>
+              <span id="fusionFlag">No fusion</span>
+              <span style="color: var(--muted);">·</span>
+              <span id="liveFlag">Idle</span>
+            </div>
+            <div class="kits" id="kitsBox" title="Detected kit colours for this match">
+              <span class="swatch" id="teamSwatch"></span>
+              <span class="kit-label">You <b id="teamKitLabel">?</b></span>
+              <span class="swatch" id="oppSwatch"></span>
+              <span class="kit-label">Enemy <b id="oppKitLabel">?</b></span>
+              <span class="kit-conf" id="kitConfidence">—</span>
+              <button class="btn mini" id="resetKitsBtn" title="Forget kit colours and recalibrate">Reset</button>
+            </div>
+            <div id="clockLabel" style="font-weight:700; color: var(--muted);">--:--:--</div>
+          </div>
+
+          <div class="controls">
+            <div class="crop-grid">
+              <div><label>X</label><input id="cropX" type="number" value="0" /></div>
+              <div><label>Y</label><input id="cropY" type="number" value="0" /></div>
+              <div><label>Width</label><input id="cropWidth" type="number" value="3440" /></div>
+              <div><label>Height</label><input id="cropHeight" type="number" value="1440" /></div>
+            </div>
+            <div class="window-row">
+              <select id="windowList"></select>
+              <input id="windowTargetInput" type="text" value="Rematch" placeholder="Window title contains" />
+              <button class="btn" id="setWindowBtn">Set window</button>
+              <button class="btn" id="clearWindowBtn">Clear</button>
+            </div>
+            <div class="button-row">
+              <button class="btn primary" id="applyCropBtn">Apply crop</button>
+              <button class="btn" id="captureBtn">Capture now</button>
+              <button class="btn" id="refreshWindowsBtn">List windows</button>
+            </div>
+          </div>
+
+          <div class="field" id="field">
+            <img class="live-frame" id="liveFrame" alt="Live Rematch frame" />
+            <div class="overlay" id="pitchOverlay"></div>
+          </div>
+        </section>
+
+        <aside class="panel stats">
+          <div class="tag warn" id="phaseTag">BUILD-UP</div>
+          <div class="kpi-grid">
+            <div class="kpi">
+              <span class="label">GoalX</span>
+              <span class="value" id="goalxScore">0</span>
+            </div>
+            <div class="kpi">
+              <span class="label">Match State</span>
+              <span class="value" id="matchState">waiting</span>
+            </div>
+            <div class="kpi">
+              <span class="label">Speed</span>
+              <span class="value" id="speedValue">0</span>
+            </div>
+            <div class="kpi">
+              <span class="label">Offense</span>
+              <span class="value" id="offenseValue">0</span>
+            </div>
+          </div>
+
+          <div class="tactical-map" id="tacticalMap" title="Detected Rematch minimap"></div>
+
+          <div class="radar-wrap">
+            <img id="radarImage" alt="Blue Lock radar" />
+          </div>
+
+          <div class="suggestions">
+            <h3>Coach suggestions</h3>
+            <ul id="suggestionsList"></ul>
+          </div>
+
+          <div class="status-box">
+            <pre id="captureStatusBox">{}</pre>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <script>
+      const stateBox = document.getElementById('captureStatusBox');
+      const matchStateEl = document.getElementById('matchState');
+      const phaseTag = document.getElementById('phaseTag');
+      const goalxScoreEl = document.getElementById('goalxScore');
+      const suggestionsList = document.getElementById('suggestionsList');
+      const radarImage = document.getElementById('radarImage');
+      const captureStateTag = document.getElementById('captureStateTag');
+      const toggleCaptureBtn = document.getElementById('toggleCaptureBtn');
+      const pitchOverlay = document.getElementById('pitchOverlay');
+      const liveFrame = document.getElementById('liveFrame');
+      const windowList = document.getElementById('windowList');
+      const fieldEl = document.getElementById('field');
+
+      let recording = false;
+
+      function fillRegion(region) {
+        if (!region) return;
+        const width = Number(region.width || 0);
+        const height = Number(region.height || 0);
+        document.getElementById('cropX').value = Number(region.x || 0);
+        document.getElementById('cropY').value = Number(region.y || 0);
+        if (width > 0) document.getElementById('cropWidth').value = width;
+        if (height > 0) document.getElementById('cropHeight').value = height;
+        if (width > 0 && height > 0 && fieldEl) {
+          fieldEl.style.aspectRatio = `${width} / ${height}`;
+        }
+      }
+
+      function kitCss(hue, sat, br, fallback) {
+        if (hue == null && !(sat >= 0)) return fallback;
+        const s = Math.max(0, Math.min(1, Number(sat || 0)));
+        const v = Math.max(0, Math.min(255, Number(br || 0))) / 255;
+        const h = ((Number(hue || 0) % 360) + 360) % 360;
+        // HSV -> RGB, lift value so dark kits stay visible on the overlay.
+        const vv = Math.max(0.45, v);
+        const c = vv * s;
+        const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+        const m = vv - c;
+        let r = 0, g = 0, b = 0;
+        if (h < 60) [r, g, b] = [c, x, 0];
+        else if (h < 120) [r, g, b] = [x, c, 0];
+        else if (h < 180) [r, g, b] = [0, c, x];
+        else if (h < 240) [r, g, b] = [0, x, c];
+        else if (h < 300) [r, g, b] = [x, 0, c];
+        else [r, g, b] = [c, 0, x];
+        const to = (n) => Math.round((n + m) * 255);
+        return `rgb(${to(r)}, ${to(g)}, ${to(b)})`;
+      }
+
+      function renderKits(profile) {
+        const root = document.documentElement;
+        const teamSwatch = document.getElementById('teamSwatch');
+        const oppSwatch = document.getElementById('oppSwatch');
+        if (!profile) {
+          root.style.setProperty('--team-color', '#7dffb5');
+          root.style.setProperty('--opp-color', '#ff4d4d');
+          teamSwatch.style.background = '#333';
+          oppSwatch.style.background = '#333';
+          document.getElementById('teamKitLabel').textContent = '?';
+          document.getElementById('oppKitLabel').textContent = '?';
+          document.getElementById('kitConfidence').textContent = 'calibrating…';
+          return;
+        }
+        const teamColor = profile.team_hue == null && !profile.team_saturation ? '#7dffb5' : kitCss(profile.team_hue, profile.team_saturation, profile.team_brightness, '#7dffb5');
+        const oppColor = profile.opp_hue == null && !profile.opp_saturation ? '#ff4d4d' : kitCss(profile.opp_hue, profile.opp_saturation, profile.opp_brightness, '#ff4d4d');
+        root.style.setProperty('--team-color', teamColor);
+        root.style.setProperty('--opp-color', oppColor);
+        teamSwatch.style.background = teamColor;
+        oppSwatch.style.background = oppColor;
+        document.getElementById('teamKitLabel').textContent = profile.team_label || '?';
+        document.getElementById('oppKitLabel').textContent = profile.opp_label || '?';
+        const pct = Math.round((profile.confidence || 0) * 100);
+        document.getElementById('kitConfidence').textContent = `${pct}%${profile.locked ? ' locked' : ''} · ${profile.samples || 0} frames`;
+      }
+
+      function renderPitch(scene) {
+        if (!scene) {
+          pitchOverlay.innerHTML = '';
+          document.getElementById('tacticalMap').innerHTML = '';
+          return;
+        }
+        const stale = scene.gameplay_detected === false ? ' stale' : '';
+        const teammates = (scene.view_teammates && scene.view_teammates.length)
+          ? scene.view_teammates
+          : [];
+        const opponents = (scene.view_opponents && scene.view_opponents.length)
+          ? scene.view_opponents
+          : [];
+        const ballX = scene.view_ball_x;
+        const ballY = scene.view_ball_y;
+        const dots = [];
+        if (scene.map_region && scene.map_region.width) {
+          dots.push(`<div class="map-ring" style="left:${scene.map_region.x}%; top:${scene.map_region.y}%; width:${scene.map_region.width}%; height:${scene.map_region.height}%;"></div>`);
+        }
+        teammates.forEach((player) => {
+          const cls = player.player_id === 'self' ? 'team map-self' : 'team';
+          dots.push(`<div class="player-dot ${cls}${stale}" style="left:${player.x}%; top:${player.y}%;" title="${player.player_id}"></div>`);
+        });
+        opponents.forEach((player) => {
+          dots.push(`<div class="player-dot opp${stale}" style="left:${player.x}%; top:${player.y}%;" title="${player.player_id}"></div>`);
+        });
+        if (ballX != null && ballY != null) {
+          dots.push(`<div class="ball" style="left:${ballX}%; top:${ballY}%;"></div>`);
+        }
+        (scene.map_teammates || []).forEach((player) => {
+          dots.push(`<div class="player-dot map-team${stale}" style="left:${player.x}%; top:${player.y}%;" title="map ${player.player_id}"></div>`);
+        });
+        (scene.map_opponents || []).forEach((player) => {
+          dots.push(`<div class="player-dot map-opp${stale}" style="left:${player.x}%; top:${player.y}%;" title="map ${player.player_id}"></div>`);
+        });
+        if (scene.map_ball_x != null && scene.map_ball_y != null) {
+          dots.push(`<div class="ball map-ball" style="left:${scene.map_ball_x}%; top:${scene.map_ball_y}%;"></div>`);
+        }
+        pitchOverlay.innerHTML = dots.join('');
+
+        // Tactical map: fused pitch coordinates (x = pitch length, drawn upward; y = pitch width).
+        const toMap = (player) => ({ left: player.y, top: 100 - player.x });
+        const mapDots = ['<div class="grid"></div>'];
+        (scene.teammates || []).forEach((player) => {
+          const pos = toMap(player);
+          const cls = player.player_id === 'map_self' ? 'map-self' : 'map-team';
+          mapDots.push(`<div class="player-dot ${cls}${stale}" style="left:${pos.left}%; top:${pos.top}%;" title="${player.player_id}"></div>`);
+        });
+        (scene.opponents || []).forEach((player) => {
+          const pos = toMap(player);
+          mapDots.push(`<div class="player-dot map-opp${stale}" style="left:${pos.left}%; top:${pos.top}%;" title="${player.player_id}"></div>`);
+        });
+        const ballPos = toMap({ x: scene.ball_x, y: scene.ball_y });
+        mapDots.push(`<div class="ball map-ball" style="left:${ballPos.left}%; top:${ballPos.top}%;"></div>`);
+        document.getElementById('tacticalMap').innerHTML = scene.map_detected ? mapDots.join('') : '';
+      }
+
+      function renderFlags(status) {
+        const scene = status.pitch_scene || {};
+        const fusion = document.getElementById('fusionFlag');
+        if (scene.source === 'fused') {
+          fusion.textContent = `Fused ${scene.fusion_matches || 0}`;
+          fusion.style.color = '#00d48b';
+        } else if (scene.source === 'minimap') {
+          fusion.textContent = 'Map only';
+          fusion.style.color = '#5bc0ff';
+        } else if (scene.source === 'camera') {
+          fusion.textContent = 'Cam only';
+          fusion.style.color = '#ffbf47';
+        } else {
+          fusion.textContent = 'No fusion';
+          fusion.style.color = '';
+        }
+        const live = document.getElementById('liveFlag');
+        if (!status.enabled) {
+          live.textContent = 'Idle';
+          live.style.color = '';
+        } else if (status.gameplay_detected) {
+          live.textContent = 'Live';
+          live.style.color = '#00d48b';
+        } else {
+          const kind = status.frame_kind || 'unknown';
+          live.textContent = kind === 'menu' ? 'Menu' : kind === 'cutscene' ? 'Cutscene' : 'Paused';
+          live.style.color = '#ff6d6d';
+        }
+      }
+
+      async function loadWindows() {
+        const response = await fetch('/capture/windows?query=');
+        const windows = await response.json();
+        windowList.innerHTML = '<option value="">Visible windows</option>' + windows.map((item) => {
+          const title = String(item.title || '').replace(/</g, '');
+          return `<option value="${title}" data-x="${item.x}" data-y="${item.y}" data-width="${item.width}" data-height="${item.height}">${title} (${item.width}x${item.height})</option>`;
+        }).join('');
+        const rematch = windows.find((item) => String(item.title || '').toLowerCase() === 'rematch');
+        if (rematch) {
+          fillRegion(rematch);
+        }
+      }
+
+      async function refreshLiveCapture() {
+        try {
+          const statusRes = await fetch('/live/capture/status');
+          const status = await statusRes.json();
+          stateBox.textContent = JSON.stringify(status, null, 2);
+          matchStateEl.textContent = status.match_state || 'waiting';
+          goalxScoreEl.textContent = Number(status.goalx_score || 0);
+
+          const phase = (status.phase || 'build-up').toUpperCase();
+          phaseTag.textContent = phase;
+          phaseTag.style.background = phase === 'ATTACK' ? 'rgba(0, 212, 139, 0.14)' : phase === 'DEFENSE' ? 'rgba(255, 109, 109, 0.14)' : 'rgba(91, 192, 255, 0.14)';
+          phaseTag.style.color = phase === 'ATTACK' ? '#00d48b' : phase === 'DEFENSE' ? '#ff6d6d' : '#5bc0ff';
+
+          document.getElementById('speedValue').textContent = status.blue_lock?.speed ?? 0;
+          document.getElementById('offenseValue').textContent = status.blue_lock?.offense ?? 0;
+          document.getElementById('hudFlag').textContent = status.hud_detected ? 'HUD on' : 'HUD off';
+          document.getElementById('windowFlag').textContent = status.window_detected ? 'Window on' : 'Window off';
+          document.getElementById('mapFlag').textContent = status.pitch_scene?.map_detected ? 'Map on' : 'Map off';
+          renderFlags(status);
+          renderKits(status.kit_profile);
+          document.getElementById('clockLabel').textContent = status.captured_at
+            ? new Date(status.captured_at).toLocaleTimeString()
+            : '--:--:--';
+
+          if (status.live_frame_url) {
+            liveFrame.src = `${status.live_frame_url}?ts=${Date.now()}`;
+          }
+          radarImage.src = '/live/blue-lock-radar.svg?ts=' + Date.now();
+
+          const tacticalFocus = Array.isArray(status.tactical_focus) && status.tactical_focus.length
+            ? status.tactical_focus
+            : ['Set a Rematch window and start capture'];
+          suggestionsList.innerHTML = tacticalFocus.map((item) => `
+            <li>
+              <span class="bullet"></span>
+              <span>${item}</span>
+            </li>
+          `).join('');
+
+          renderPitch(status.pitch_scene);
+          recording = !!status.recording;
+          captureStateTag.textContent = recording ? 'LIVE' : 'WAITING';
+          captureStateTag.style.background = recording ? 'rgba(0, 212, 139, 0.14)' : 'rgba(255, 191, 71, 0.12)';
+          captureStateTag.style.color = recording ? '#00d48b' : '#ffbf47';
+          toggleCaptureBtn.textContent = recording ? 'Stop capture' : 'Start capture';
+          if (status.image_size && status.image_size.width && status.image_size.height) {
+            fieldEl.style.aspectRatio = `${status.image_size.width} / ${status.image_size.height}`;
+          }
+          if (status.crop_region && status.crop_region.width) {
+            fillRegion(status.crop_region);
+          }
+        } catch (error) {
+          stateBox.textContent = JSON.stringify({ error: String(error) }, null, 2);
+        }
+      }
+
+      async function captureFrame() {
+        try {
+          const response = await fetch('/capture/frame', { method: 'POST' });
+          const data = await response.json();
+          stateBox.textContent = JSON.stringify(data, null, 2);
+          liveFrame.src = `/capture/latest?ts=${Date.now()}`;
+          await refreshLiveCapture();
+        } catch (error) {
+          stateBox.textContent = JSON.stringify({ error: String(error) }, null, 2);
+        }
+      }
+
+      async function applyCrop() {
+        const payload = {
+          x: Number(document.getElementById('cropX').value || 0),
+          y: Number(document.getElementById('cropY').value || 0),
+          width: Number(document.getElementById('cropWidth').value || 3440),
+          height: Number(document.getElementById('cropHeight').value || 1440),
+          enabled: true,
+        };
+        const response = await fetch('/capture/config', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        stateBox.textContent = JSON.stringify(await response.json(), null, 2);
+      }
+
+      toggleCaptureBtn.addEventListener('click', async () => {
+        try {
+          if (!recording) {
+            const response = await fetch('/capture/start', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ interval_seconds: 1.5 }),
+            });
+            recording = !!(await response.json()).running;
+          } else {
+            const response = await fetch('/capture/stop', { method: 'POST' });
+            recording = !!(await response.json()).running;
+          }
+        } catch (error) {
+          stateBox.textContent = JSON.stringify({ error: String(error) }, null, 2);
+        }
+        await refreshLiveCapture();
+      });
+
+      document.getElementById('setWindowBtn').addEventListener('click', async () => {
+        try {
+          const title = document.getElementById('windowTargetInput').value || 'Rematch';
+          const response = await fetch('/capture/window-target', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ title_contains: title }),
+          });
+          const data = await response.json();
+          stateBox.textContent = JSON.stringify(data, null, 2);
+          if (data.region) {
+            fillRegion(data.region);
+          }
+          await refreshLiveCapture();
+        } catch (error) {
+          stateBox.textContent = JSON.stringify({ error: String(error) }, null, 2);
+        }
+      });
+
+      document.getElementById('clearWindowBtn').addEventListener('click', async () => {
+        try {
+          const response = await fetch('/capture/window-target', { method: 'DELETE' });
+          stateBox.textContent = JSON.stringify(await response.json(), null, 2);
+          await refreshLiveCapture();
+        } catch (error) {
+          stateBox.textContent = JSON.stringify({ error: String(error) }, null, 2);
+        }
+      });
+
+      windowList.addEventListener('change', () => {
+        const selected = windowList.options[windowList.selectedIndex];
+        if (windowList.value) {
+          document.getElementById('windowTargetInput').value = windowList.value;
+          fillRegion({
+            x: selected.dataset.x,
+            y: selected.dataset.y,
+            width: selected.dataset.width,
+            height: selected.dataset.height,
+          });
+        }
+      });
+
+      document.getElementById('resetKitsBtn').addEventListener('click', async () => {
+        try {
+          const response = await fetch('/live/kits/reset', { method: 'POST' });
+          stateBox.textContent = JSON.stringify(await response.json(), null, 2);
+          await refreshLiveCapture();
+        } catch (error) {
+          stateBox.textContent = JSON.stringify({ error: String(error) }, null, 2);
+        }
+      });
+
+      document.getElementById('applyCropBtn').addEventListener('click', applyCrop);
+      document.getElementById('captureBtn').addEventListener('click', captureFrame);
+      document.getElementById('refreshWindowsBtn').addEventListener('click', loadWindows);
+      document.getElementById('refreshBtn').addEventListener('click', refreshLiveCapture);
+      setInterval(refreshLiveCapture, 2000);
+      loadWindows();
+      refreshLiveCapture();
+    </script>
+  </body>
+</html>

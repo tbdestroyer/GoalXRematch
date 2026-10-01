@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GoalX Rematch PC Demo</title>
+  <style>
+    body { font-family: Segoe UI, Arial, sans-serif; background: #0f1116; color: #e8ecf1; margin: 0; }
+    .wrap { max-width: 1080px; margin: 24px auto; padding: 0 16px; }
+    .grid { display: grid; gap: 16px; grid-template-columns: 340px 1fr; }
+    .card { background: #171b22; border: 1px solid #2b3340; border-radius: 12px; padding: 16px; }
+    h1, h2 { margin: 0 0 10px; }
+    label { font-size: 13px; color: #a8b1c2; }
+    input { width: 100%; margin-top: 6px; margin-bottom: 12px; background: #0e131b; color: #e8ecf1; border: 1px solid #374355; border-radius: 8px; padding: 10px; }
+    button { background: #00b56a; color: #072514; border: none; border-radius: 8px; padding: 10px 12px; font-weight: 700; cursor: pointer; }
+    button.secondary { background: #334055; color: #e8ecf1; margin-left: 8px; }
+    pre { background: #0e131b; border: 1px solid #2b3340; border-radius: 8px; padding: 10px; overflow: auto; }
+    img { width: 100%; max-width: 640px; background: #fff; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>GoalX for Rematch (PC) - Example UI</h1>
+    <p>Connect account + export folder, then GoalX auto-updates after each game file lands.</p>
+    <div class="grid">
+      <div class="card">
+        <h2>Connection</h2>
+        <label>Account Name</label>
+        <input id="accountName" value="my-rematch-account" />
+        <label>Export Folder</label>
+        <input id="exportFolder" value="C:\RematchGoalX\exports" />
+        <label>Linked Player ID</label>
+        <input id="linkedPlayerId" value="bluelock_9" />
+        <label>Poll Seconds</label>
+        <input id="pollSeconds" type="number" value="15" />
+        <button id="connectBtn">Connect</button>
+        <button class="secondary" id="syncBtn">Sync Now</button>
+        <h2 style="margin-top:16px;">Auto Export Helper</h2>
+        <label>Source Folder (where exporter writes)</label>
+        <input id="sourceFolder" value="C:\RematchGoalX\source-exports" />
+        <label>Log Folder (match-end logs)</label>
+        <input id="logFolder" value="C:\RematchGoalX\logs" />
+        <label>Auto Export Poll Seconds</label>
+        <input id="autoPollSeconds" type="number" value="5" />
+        <button id="saveAutoExportBtn">Save Auto-Export</button>
+        <button class="secondary" id="runAutoExportBtn">Run Auto-Export Once</button>
+        <h2 style="margin-top:16px;">Auto Export Status</h2>
+        <pre id="autoExportStatusBox">{}</pre>
+        <h2 style="margin-top:16px;">Status</h2>
+        <pre id="statusBox">{}</pre>
+      </div>
+      <div class="card">
+        <h2>Player GoalX</h2>
+        <label>Player ID</label>
+        <input id="playerId" value="bluelock_9" />
+        <button id="refreshBtn">Refresh Player</button>
+        <h2 style="margin-top:16px;">Snapshot JSON</h2>
+        <pre id="snapshotBox">{}</pre>
+        <h2 style="margin-top:16px;">Blue-Lock Radar</h2>
+        <img id="radarImage" alt="Blue-Lock Radar" />
+      </div>
+    </div>
+  </div>
+  <script>
+    async function loadStatus() {
+      const res = await fetch('/connect/rematch-account/status');
+      document.getElementById('statusBox').textContent = JSON.stringify(await res.json(), null, 2);
+    }
+
+    async function loadAutoExportStatus() {
+      const res = await fetch('/auto-export/status');
+      document.getElementById('autoExportStatusBox').textContent = JSON.stringify(await res.json(), null, 2);
+    }
+
+    async function connect() {
+      const payload = {
+        account_name: document.getElementById('accountName').value,
+        export_directory: document.getElementById('exportFolder').value,
+        linked_player_id: document.getElementById('linkedPlayerId').value,
+        poll_seconds: Number(document.getElementById('pollSeconds').value),
+        auto_sync: true
+      };
+      const res = await fetch('/connect/rematch-account', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      document.getElementById('statusBox').textContent = JSON.stringify(await res.json(), null, 2);
+    }
+
+    async function syncNow() {
+      await fetch('/sync/rematch-now', { method: 'POST' });
+      await loadStatus();
+      await loadAutoExportStatus();
+      await refreshPlayer();
+    }
+
+    async function saveAutoExport() {
+      const payload = {
+        enabled: true,
+        source_directory: document.getElementById('sourceFolder').value,
+        log_directory: document.getElementById('logFolder').value,
+        poll_seconds: Number(document.getElementById('autoPollSeconds').value)
+      };
+      const res = await fetch('/auto-export/config', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      document.getElementById('autoExportStatusBox').textContent = JSON.stringify(await res.json(), null, 2);
+    }
+
+    async function runAutoExportOnce() {
+      const res = await fetch('/auto-export/run-once', { method: 'POST' });
+      const runResult = await res.json();
+      document.getElementById('autoExportStatusBox').textContent = JSON.stringify(runResult, null, 2);
+      await fetch('/sync/rematch-now', { method: 'POST' });
+      await loadStatus();
+      await refreshMe();
+      await loadAutoExportStatus();
+    }
+
+    async function refreshPlayer() {
+      const playerId = document.getElementById('playerId').value;
+      const snapshotRes = await fetch(`/players/${encodeURIComponent(playerId)}/goalx`);
+      document.getElementById('snapshotBox').textContent = JSON.stringify(await snapshotRes.json(), null, 2);
+      document.getElementById('radarImage').src = `/players/${encodeURIComponent(playerId)}/blue-lock-radar.svg?ts=${Date.now()}`;
+    }
+
+    async function refreshMe() {
+      const snapshotRes = await fetch('/me/goalx');
+      if (!snapshotRes.ok) {
+        return;
+      }
+      document.getElementById('snapshotBox').textContent = JSON.stringify(await snapshotRes.json(), null, 2);
+      document.getElementById('radarImage').src = `/me/blue-lock-radar.svg?ts=${Date.now()}`;
+    }
+
+    document.getElementById('connectBtn').addEventListener('click', connect);
+    document.getElementById('syncBtn').addEventListener('click', syncNow);
+    document.getElementById('saveAutoExportBtn').addEventListener('click', saveAutoExport);
+    document.getElementById('runAutoExportBtn').addEventListener('click', runAutoExportOnce);
+    document.getElementById('refreshBtn').addEventListener('click', refreshPlayer);
+    setInterval(loadStatus, 15000);
+    setInterval(loadAutoExportStatus, 15000);
+    setInterval(refreshMe, 15000);
+    loadStatus();
+    loadAutoExportStatus();
+  </script>
+</body>
+</html>

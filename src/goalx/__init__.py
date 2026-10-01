@@ -1,0 +1,2 @@
+"""GoalX package."""
+

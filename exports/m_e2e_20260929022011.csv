@@ -1,0 +1,2 @@
+﻿match_id,played_at,player_id,minutes,shots,shots_on_target,goals,assists,key_passes,successful_dribbles,dribble_attempts,completed_passes,attempted_passes,tackles_won,interceptions,duels_won,duels_total,sprints,distance_m
+m_e2e_20260929022011,2026-09-29T06:20:00+00:00,bluelock_9,90,6,4,2,1,5,4,6,36,44,2,2,5,8,24,10900
